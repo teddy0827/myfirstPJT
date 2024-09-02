@@ -1,0 +1,106 @@
+import pandas as pd
+import os
+
+# nau 파일이 있는 폴더 경로
+folder_path = 'C:/py_data/nau'
+
+# 추출할 컬럼 위치 설정 (예: 첫 번째 열은 0, 두 번째 열은 1로 인덱스 시작)
+columns_to_extract = [0, 1, 2, 3, 4, 5, 6, 7]  # Wafer, TEST, DieX, DieY, X_reg, Y_reg, MRC_X, MRC_Y의 열 위치
+
+# 결과를 담을 빈 데이터프레임 생성
+combined_rawdata = pd.DataFrame()
+combined_trocs_input = pd.DataFrame()
+mrc_data = pd.DataFrame()
+
+
+# 폴더 내 모든 nau 파일에 대해 반복
+for file_name in os.listdir(folder_path):
+    if file_name.endswith('.nau'):
+        file_path = os.path.join(folder_path, file_name)
+        
+        # 각 파일의 RawData-1, Trocs Input 시트에서 데이터 불러오기
+        file_sheets = pd.read_excel(file_path, sheet_name=None)
+        rawdata_file = file_sheets['RawData-1']
+        trocs_input_file = file_sheets['Trocs Input']
+        
+        ''' RAW DATA '''
+        # RawData-1 시트 처리
+        extracted_data_raw = rawdata_file.iloc[:, columns_to_extract]
+        
+        # 14번째 컬럼 (인덱스 13)의 0번째 행 값을 STEPSEQ로 설정
+        stepseq_value_raw = rawdata_file.iloc[0, 13]
+        
+        # 'STEPSEQ' 컬럼 생성 및 채우기
+        extracted_data_raw['STEPSEQ'] = stepseq_value_raw
+        
+        # 14번째 컬럼 (인덱스 13)의 이름을 LOT ID로 설정
+        lot_id_value_raw = rawdata_file.columns[13]
+        
+        # 'LOT ID' 컬럼 생성 및 채우기
+        extracted_data_raw['LOT ID'] = lot_id_value_raw
+        
+        # 'STEPSEQ'와 'LOT ID' 컬럼을 맨 앞에 위치시키기
+        cols_raw = extracted_data_raw.columns.tolist()
+        cols_raw = ['STEPSEQ', 'LOT ID'] + cols_raw[:-2]  # 'STEPSEQ'와 'LOT ID' 컬럼을 맨 앞으로 이동
+        extracted_data_raw = extracted_data_raw[cols_raw]
+        
+        # RawData-1 시트 데이터를 합치기
+        combined_rawdata = pd.concat([combined_rawdata, extracted_data_raw])
+        
+
+
+        ''' TROCS INPUT '''
+
+        # Trocs Input 시트 처리 (모든 행과 열을 포함)
+        lot_id_value_trocs = lot_id_value_raw  # RawData-1 시트의 14번째 컬럼 제목을 사용
+        trocs_input_file['LOT ID'] = lot_id_value_trocs
+        
+        # 'LOT ID' 컬럼을 맨 앞에 위치시키기
+        cols_trocs = trocs_input_file.columns.tolist()
+        cols_trocs = ['LOT ID'] + cols_trocs[:-1]  # 'LOT ID' 컬럼을 맨 앞으로 이동
+        trocs_input_file = trocs_input_file[cols_trocs]
+        
+        # Trocs Input 시트 데이터를 합치기
+        combined_trocs_input = pd.concat([combined_trocs_input, trocs_input_file])
+
+
+
+
+        ''' MRC '''
+
+        # 각 파일의 RawData-1 시트에서 데이터 불러오기 (header=None으로 컬럼 이름도 데이터로 가져옴)
+        file_sheets = pd.read_excel(file_path, sheet_name=None, header=None)
+        rawdata_file = file_sheets['RawData-1']
+       
+
+        # 14열과 15열의 0행부터 19행까지 데이터를 포함 (컬럼 이름 포함)
+        mrc_part1 = rawdata_file.iloc[0:20, 15:17]  # 0:20 행 (0행부터 19행), 13:15 열 (14열, 15열)
+        mrc_part2 = rawdata_file.iloc[22:40, 15:17]  # 0:20 행 (0행부터 19행), 13:15 열 (14열, 15열)
+
+        # 두 개의 부분을 합쳐서 하나의 데이터프레임으로 만들기 (위아래로 결합)
+        mrc_part = pd.concat([mrc_part1, mrc_part2], axis=0).reset_index(drop=True)
+
+        # 기존 컬럼 이름을 새로운 컬럼 이름으로 변경
+        mrc_part.columns = ['K PARA', 'GPM']
+        
+                
+        # 'STEPSEQ' 컬럼 생성 및 채우기
+        mrc_part['STEPSEQ'] = stepseq_value_raw
+        
+             
+        # 'LOT ID' 컬럼 생성 및 채우기
+        mrc_part['LOT ID'] = lot_id_value_raw
+
+
+        # MRC 데이터를 합치기
+        mrc_data = pd.concat([mrc_data, mrc_part])
+
+
+
+# 최종 데이터를 새로운 엑셀 파일로 저장 (2개의 시트: RawData-1과 Trocs Input)
+with pd.ExcelWriter('output.xlsx') as writer:
+    combined_rawdata.to_excel(writer, sheet_name='RawData-1', index=False)
+    combined_trocs_input.to_excel(writer, sheet_name='Trocs Input', index=False)
+    mrc_data.to_excel(writer, sheet_name='MRC', index=False)
+
+
