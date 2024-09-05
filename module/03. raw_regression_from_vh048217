@@ -1,0 +1,118 @@
+import pandas as pd
+import numpy as np
+
+# 엑셀 파일에서 데이터 불러오기
+df = pd.read_excel("C:/py_data/module/output.xlsx")
+
+
+
+
+# die x, die y, step pitch x, step pitch y 값 추출
+die_x = df['DieX']
+die_y = df['DieY']
+step_pitch_x = df['STEP_PITCH_X']
+step_pitch_y = df['STEP_PITCH_Y']
+map_shift_x = df['MAP_SHIFT_X']
+map_shift_y = df['MAP_SHIFT_Y']
+field_x = df['coordinate_X']
+field_y = df['coordinate_Y']
+
+# x, y 좌표 계산
+x = die_x * step_pitch_x + map_shift_x
+y = die_y * step_pitch_y + map_shift_y
+rx = field_x
+ry = field_y
+
+
+'''
+RK는 1023/511 모드임. RK20제거
+'''
+
+
+# X_dx 데이터 구성 (wk5 계산 시만 -y 사용, 3차항 포함)
+X_dx = np.vstack([
+    np.ones(len(x)), (x)/10**6, (-y)/10**6, (x**2)/10**12, (x*y)/10**12, (y**2)/10**12, (x**3)/10**15, (x**2*y)/10**15, (x*y**2)/10**15, (y**3)/10**15, 
+                     (rx)/10**6, (-ry)/10**6, (rx**2)/10**9, (rx*ry)/10**9, (ry**2)/10**9, (rx**3)/10**12, (rx**2*ry)/10**12, (rx*ry**2)/10**12, (ry**3)/10**12
+]).T
+
+
+# X_dy 데이터 구성 (3차항 포함, y를 그대로 사용)
+X_dy = np.vstack([
+    np.ones(len(y)), (y)/10**6, (x)/10**6, (y**2)/10**12, (y*x)/10**12, (x**2)/10**12, (y**3)/10**15, (y**2*x)/10**15, (y*x**2)/10**15, (x**3)/10**15,
+                     (ry)/10**6, (rx)/10**6, (ry**2)/10**9, (ry*rx)/10**9, (rx**2)/10**9, (ry**3)/10**12, (ry**2*rx)/10**12, (ry*rx**2)/10**12
+]).T
+
+
+
+# Y_dx, Y_dy 데이터
+Y_dx = df['X_reg']
+Y_dy = df['Y_reg']
+
+# 최소자승법으로 dx의 계수 구하기 (X_dx 사용)
+coeff_dx = np.linalg.lstsq(X_dx, Y_dx, rcond=None)[0]
+
+# 최소자승법으로 dy의 계수 구하기 (X_dy 사용)
+coeff_dy = np.linalg.lstsq(X_dy, Y_dy, rcond=None)[0]
+
+
+
+
+# dx의 결과 출력 (3차항 포함 계수명 추가)
+# dy의 결과 출력 (3차항 포함 계수명 추가)
+
+print("Coefficients for misalign x(um):")
+print("\nCoefficients for misalign y(um):")
+
+print(f"WK1 (Offset_x): {coeff_dx[0]}")
+print(f"WK2 (Offset_y): {coeff_dy[0]}")
+print(f"WK3 (Scale_x): {coeff_dx[1]}")
+print(f"WK4 (Scale_y): {coeff_dy[1]}")
+print(f"WK5 (Rotation_x_with_-y): {coeff_dx[2]}")  # 여기서 -y 반영됨
+print(f"WK6 (Rotation_y): {coeff_dy[2]}")
+print(f"WK7 (x^2): {coeff_dx[3]}")
+print(f"WK8 (x^2): {coeff_dy[3]}")
+print(f"WK9 (xy): {coeff_dx[4]}")
+print(f"WK10 (xy): {coeff_dy[4]}")
+print(f"WK11 (y^2): {coeff_dx[5]}")
+print(f"WK12 (y^2): {coeff_dy[5]}")
+print(f"WK13 (x^3): {coeff_dx[6]}")
+print(f"WK14 (x^3): {coeff_dy[6]}")
+print(f"WK15 (x^2*y): {coeff_dx[7]}")
+print(f"WK16 (x^2*y): {coeff_dy[7]}")
+print(f"WK17 (x*y^2): {coeff_dx[8]}")
+print(f"WK18 (x*y^2): {coeff_dy[8]}")
+print(f"WK19 (y^3): {coeff_dx[9]}")
+print(f"WK20 (y^3): {coeff_dy[9]}")
+
+
+print(f"RK1 (Offset_x): ")
+print(f"RK2 (Offset_y): ")
+
+print(f"RK3 (Scale_x): {coeff_dx[10]}")
+print(f"RK4 (Scale_y): {coeff_dy[10]}")
+print(f"RK5 (Rotation_x_with_-y): {coeff_dx[11]}")  # 여기서 -y 반영됨
+print(f"RK6 (Rotation_y): {coeff_dy[11]}")
+print(f"RK7 (x^2): {coeff_dx[12]}")
+print(f"RK8 (x^2): {coeff_dy[12]}")
+print(f"RK9 (xy): {coeff_dx[13]}")
+print(f"RK10 (xy): {coeff_dy[13]}")
+print(f"RK11 (y^2): {coeff_dx[14]}")
+print(f"RK12 (y^2): {coeff_dy[14]}")
+print(f"RK13 (x^3): {coeff_dx[15]}")
+print(f"RK14 (x^3): {coeff_dy[15]}")
+print(f"RK15 (x^2*y): {coeff_dx[16]}")
+print(f"RK16 (x^2*y): {coeff_dy[16]}")
+print(f"RK17 (x*y^2): {coeff_dx[17]}")
+print(f"RK18 (x*y^2): {coeff_dy[17]}")
+print(f"RK19 (y^3): {coeff_dx[18]}")
+
+
+
+
+
+
+
+
+
+
+
