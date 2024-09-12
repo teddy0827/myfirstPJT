@@ -1,0 +1,398 @@
+import pandas as pd
+import numpy as np
+import os
+from openpyxl import load_workbook
+import openpyxl
+
+
+
+# nau 파일이 있는 폴더 경로
+folder_path = 'C:/py_data/nau'
+
+# 추출할 컬럼 위치 설정 (예: 첫 번째 열은 0, 두 번째 열은 1로 인덱스 시작)
+columns_to_extract = [0, 1, 2, 3, 4, 5, 6, 7]  # Wafer, TEST, DieX, DieY, X_reg, Y_reg, MRC_X, MRC_Y의 열 위치
+
+# 결과를 담을 빈 데이터프레임 생성
+combined_rawdata = pd.DataFrame()
+combined_trocs_input = pd.DataFrame()
+mrc_data = pd.DataFrame()
+
+# VLOOKUP과 유사한 함수 정의
+def vlookup(value, lookup_range, return_column_index):
+    """
+    value: 찾고자 하는 값 (lookup value)
+    lookup_range: 검색 범위가 포함된 DataFrame
+    return_column_index: 반환할 열 번호 (1부터 시작)
+    """
+    for index, row in lookup_range.iterrows():
+        if row[0] == value:
+            return row[return_column_index - 1]
+    return None  # 값을 찾지 못했을 때 None 반환
+
+# 폴더 내 모든 nau 파일에 대해 반복
+for file_name in os.listdir(folder_path):
+    if file_name.endswith('.nau'):
+        file_path = os.path.join(folder_path, file_name)
+        
+        # 각 파일의 RawData-1, Trocs Input 시트에서 데이터 불러오기
+        file_sheets = pd.read_excel(file_path, sheet_name=None)
+        rawdata_file = file_sheets['RawData-1']
+        trocs_input_file = file_sheets['Trocs Input']
+        
+        ''' RAW DATA '''
+        # RawData-1 시트 처리
+        extracted_data_raw = rawdata_file.iloc[:, columns_to_extract]
+        
+        # 14번째 컬럼 (인덱스 13)의 0번째 행 값을 STEPSEQ로 설정
+        stepseq_value_raw = rawdata_file.iloc[0, 13]
+        
+        # 'STEPSEQ' 컬럼 생성 및 채우기
+        extracted_data_raw['STEPSEQ'] = stepseq_value_raw
+        
+        # 14번째 컬럼 (인덱스 13)의 이름을 LOT ID로 설정
+        lot_id_value_raw = rawdata_file.columns[13]
+        
+        # 'LOT ID' 컬럼 생성 및 채우기
+        extracted_data_raw['LOT_ID'] = lot_id_value_raw
+
+        # 'STEPSEQ'와 'LOT ID' 컬럼을 맨 앞에 위치시키기
+        cols_raw = extracted_data_raw.columns.tolist()
+        cols_raw = ['STEPSEQ', 'LOT_ID'] + cols_raw[:-2]  # 'STEPSEQ'와 'LOT ID' 컬럼을 맨 앞으로 이동
+        extracted_data_raw = extracted_data_raw[cols_raw]
+
+        
+         # step pitch, map shift 컬럼 생성 및 채우기
+        step_pitch_x_value = rawdata_file.iloc[6, 13]
+        extracted_data_raw['STEP_PITCH_X'] = step_pitch_x_value
+        step_pitch_y_value = rawdata_file.iloc[7, 13]
+        extracted_data_raw['STEP_PITCH_Y'] = step_pitch_y_value
+        map_shift_x_value = rawdata_file.iloc[8, 13]
+        extracted_data_raw['MAP_SHIFT_X'] = map_shift_x_value
+        map_shift_y_value = rawdata_file.iloc[9, 13]
+        extracted_data_raw['MAP_SHIFT_Y'] = map_shift_y_value
+
+        
+        # VLOOKUP 구현 (TEST 열을 기준으로 coordinate_X 값을 찾고 추가)
+        lookup_range = rawdata_file[['Test No', 'coordinate_X', 'coordinate_Y']]
+        extracted_data_raw['coordinate_X'] = extracted_data_raw['TEST'].apply(lambda x: vlookup(x, lookup_range, 2))  # 'coordinate_X' 값을 반환
+        extracted_data_raw['coordinate_Y'] = extracted_data_raw['TEST'].apply(lambda x: vlookup(x, lookup_range, 3))  # 'coordinate_Y' 값을 반환   
+
+        # RawData-1 시트 데이터를 합치기
+        combined_rawdata = pd.concat([combined_rawdata, extracted_data_raw])
+        
+
+
+
+
+        
+        ''' TROCS INPUT '''
+        lot_id_value_trocs = lot_id_value_raw  # RawData-1 시트의 14번째 컬럼 제목을 사용
+        trocs_input_file['LOT_ID'] = lot_id_value_trocs
+        
+        # 'LOT ID' 컬럼을 맨 앞에 위치시키기
+        cols_trocs = trocs_input_file.columns.tolist()
+        cols_trocs = ['LOT_ID'] + cols_trocs[:-1]  # 'LOT ID' 컬럼을 맨 앞으로 이동
+        trocs_input_file = trocs_input_file[cols_trocs]
+        
+        # Trocs Input 시트 데이터를 합치기
+        combined_trocs_input = pd.concat([combined_trocs_input, trocs_input_file])
+        
+        ''' MRC '''
+        # 각 파일의 RawData-1 시트에서 데이터 불러오기 (header=None으로 컬럼 이름도 데이터로 가져옴)
+        file_sheets = pd.read_excel(file_path, sheet_name=None, header=None)
+        rawdata_file = file_sheets['RawData-1']
+       
+        # 14열과 15열의 0행부터 19행까지 데이터를 포함 (컬럼 이름 포함)
+        mrc_part1 = rawdata_file.iloc[0:20, 15:17]
+        mrc_part2 = rawdata_file.iloc[22:40, 15:17]
+        
+        # 두 개의 부분을 합쳐서 하나의 데이터프레임으로 만들기
+        mrc_part = pd.concat([mrc_part1, mrc_part2], axis=0).reset_index(drop=True)
+        mrc_part.columns = ['K PARA', 'GPM']
+        
+        # 'STEPSEQ' 컬럼 생성 및 채우기
+        mrc_part['STEPSEQ'] = stepseq_value_raw
+        
+        # 'LOT ID' 컬럼 생성 및 채우기
+        mrc_part['LOT ID'] = lot_id_value_raw
+        
+        # MRC 데이터를 합치기
+        mrc_data = pd.concat([mrc_data, mrc_part])
+
+# 최종 데이터를 새로운 엑셀 파일로 저장 (2개의 시트: RawData-1과 Trocs Input)
+with pd.ExcelWriter('output.xlsx') as writer:
+    combined_rawdata.to_excel(writer, sheet_name='RawData-1', index=False)
+    combined_trocs_input.to_excel(writer, sheet_name='Trocs Input', index=False)
+    mrc_data.to_excel(writer, sheet_name='MRC', index=False)
+
+
+
+
+
+
+
+
+
+################################### MULTI LOT REGRESSION #####################################################################
+
+
+
+# 엑셀 파일에서 데이터 불러오기
+df = pd.read_excel("C:/vscode/MODULE/output.xlsx")
+
+# LOT ID별로 데이터를 그룹화
+grouped = df.groupby('LOT_ID')
+
+# 그룹별로 결과를 저장할 리스트 초기화
+coeff_dx_list = []
+coeff_dy_list = []
+lot_id_list = []
+
+
+# 회귀분석 결과를 저장할 리스트 (딕셔너리 객체들로 구성됨)
+wkrk_results = []  # 딕셔너리가 아닌 리스트로 선언
+
+
+
+# 각 그룹에 대해 처리
+for lot_id, group in grouped:
+    die_x = group['DieX']
+    die_y = group['DieY']
+    step_pitch_x = group['STEP_PITCH_X']
+    step_pitch_y = group['STEP_PITCH_Y']
+    map_shift_x = group['MAP_SHIFT_X']
+    map_shift_y = group['MAP_SHIFT_Y']
+    field_x = group['coordinate_X']
+    field_y = group['coordinate_Y']
+    
+    # x, y 좌표 계산
+    x = die_x * step_pitch_x + map_shift_x
+    y = die_y * step_pitch_y + map_shift_y
+    rx = field_x
+    ry = field_y
+    
+    # X_dx 데이터 구성 (wk5 계산 시만 -y 사용, 3차항 포함)
+    X_dx = np.vstack([
+        np.ones(len(x)), (x)/10**6, (-y)/10**6, (x**2)/10**12, (x*y)/10**12, (y**2)/10**12, (x**3)/10**15, (x**2*y)/10**15, (x*y**2)/10**15, (y**3)/10**15, 
+                         (rx)/10**6, (-ry)/10**6, (rx**2)/10**9, (rx*ry)/10**9, (ry**2)/10**9, (rx**3)/10**12, (rx**2*ry)/10**12, (rx*ry**2)/10**12, (ry**3)/10**12
+    ]).T
+    
+    # X_dy 데이터 구성 (3차항 포함, y를 그대로 사용)
+    X_dy = np.vstack([
+        np.ones(len(y)), (y)/10**6, (x)/10**6, (y**2)/10**12, (y*x)/10**12, (x**2)/10**12, (y**3)/10**15, (y**2*x)/10**15, (y*x**2)/10**15, (x**3)/10**15,
+                         (ry)/10**6, (rx)/10**6, (ry**2)/10**9, (ry*rx)/10**9, (rx**2)/10**9, (ry**3)/10**12, (ry**2*rx)/10**12, (ry*rx**2)/10**12
+    ]).T
+    
+    # Y_dx, Y_dy 데이터
+    Y_dx = group['X_reg']
+    Y_dy = group['Y_reg']
+    
+    # 최소자승법으로 dx의 계수 구하기 (X_dx 사용)
+    coeff_dx = np.linalg.lstsq(X_dx, Y_dx, rcond=None)[0]
+    
+    # 최소자승법으로 dy의 계수 구하기 (X_dy 사용)
+    coeff_dy = np.linalg.lstsq(X_dy, Y_dy, rcond=None)[0]
+
+    
+    # 회귀분석 결과를 리스트에 저장
+    wkrk_results.append(pd.DataFrame({
+        'LOT_ID': [lot_id],  # lot_id를 리스트로 감쌈
+        'WK1': [coeff_dx[0]],  # 단일 값들은 리스트로 변환
+        'WK2': [coeff_dy[0]],
+        'WK3': [coeff_dx[1]],
+        'WK4': [coeff_dy[1]],
+        'WK5': [coeff_dx[2]],
+        'WK6': [coeff_dy[2]],
+        'WK7': [coeff_dx[3]],
+        'WK8': [coeff_dy[3]],
+        'WK9': [coeff_dx[4]],
+        'WK10': [coeff_dy[4]],
+        'WK11': [coeff_dx[5]],
+        'WK12': [coeff_dy[5]],
+        'WK13': [coeff_dx[6]],
+        'WK14': [coeff_dy[6]],
+        'WK15': [coeff_dx[7]],
+        'WK16': [coeff_dy[7]],
+        'WK17': [coeff_dx[8]],
+        'WK18': [coeff_dy[8]],
+        'WK19': [coeff_dx[9]],
+        'WK20': [coeff_dy[9]],
+        'RK1': [0],  # 단일 값이므로 리스트로 변환
+        'RK2': [0],
+        'RK3': [coeff_dx[10]],
+        'RK4': [coeff_dy[10]],
+        'RK5': [coeff_dx[11]],
+        'RK6': [coeff_dy[11]],
+        'RK7': [coeff_dx[12]],
+        'RK8': [coeff_dy[12]],
+        'RK9': [coeff_dx[13]],
+        'RK10': [coeff_dy[13]],
+        'RK11': [coeff_dx[14]],
+        'RK12': [coeff_dy[14]],
+        'RK13': [coeff_dx[15]],
+        'RK14': [coeff_dy[15]],
+        'RK15': [coeff_dx[16]],
+        'RK16': [coeff_dy[16]],
+        'RK17': [coeff_dx[17]],
+        'RK18': [coeff_dy[17]],
+        'RK19': [coeff_dx[18]],
+        'RK20': [0],
+    }))
+
+    
+    # 결과 저장
+    coeff_dx_list.append(coeff_dx)
+    coeff_dy_list.append(coeff_dy)
+    lot_id_list.append(lot_id)
+
+# 길이가 다를 경우 자동으로 NaN을 추가해 DataFrame 생성
+coeff_df = pd.DataFrame({
+    'LOT_ID': lot_id_list,
+    'Coeff_dx': [list(coeff) for coeff in coeff_dx_list],
+    'Coeff_dy': [list(coeff) for coeff in coeff_dy_list]
+})
+
+
+
+# 기존 엑셀 파일을 쓰기 모드로 열고 'CPE' 시트에 회귀분석 결과를 저장
+with pd.ExcelWriter("C:/vscode/MODULE/output.xlsx", engine='openpyxl', mode='a') as writer:
+    # wkrk_results 리스트 안에 있는 DataFrame을 모두 합침
+    combined_results = pd.concat(wkrk_results, ignore_index=True)
+    combined_results.to_excel(writer, sheet_name='WKRK', index=False)
+
+    
+
+################################### MULTI LOT FITTING, RESIDUAL #####################################################################
+
+
+
+
+# 기존 파일 불러오기
+file_path = "C:/vscode/MODULE/output.xlsx"
+sheet_name = "OSR(WK_RK)"
+
+# 기존 파일 불러오기
+book = load_workbook(file_path)
+
+# 기존 시트가 있을 경우 삭제
+if sheet_name in book.sheetnames:
+    del book[sheet_name]  # 기존 시트 삭제
+
+# 새로운 시트에 값 저장
+with pd.ExcelWriter(file_path, engine='openpyxl', mode='a') as writer:
+    writer.book = book  # 기존 파일 내용을 가져오기
+    coeff_df.to_excel(writer, sheet_name=sheet_name, index=False)
+
+# 예측값 계산: K 계수들을 사용 (각 LOT ID별로 예측값 계산)
+predictions_list = []
+for lot_id, group in grouped:
+    die_x = group['DieX']
+    die_y = group['DieY']
+    step_pitch_x = group['STEP_PITCH_X']
+    step_pitch_y = group['STEP_PITCH_Y']
+    map_shift_x = group['MAP_SHIFT_X']
+    map_shift_y = group['MAP_SHIFT_Y']
+    field_x = group['coordinate_X']
+    field_y = group['coordinate_Y']
+    
+    x = die_x * step_pitch_x + map_shift_x
+    y = die_y * step_pitch_y + map_shift_y
+    rx = field_x
+    ry = field_y
+    
+    X_dx = np.vstack([
+        np.ones(len(x)), (x)/10**6, (-y)/10**6, (x**2)/10**12, (x*y)/10**12, (y**2)/10**12, (x**3)/10**15, (x**2*y)/10**15, (x*y**2)/10**15, (y**3)/10**15, 
+                         (rx)/10**6, (-ry)/10**6, (rx**2)/10**9, (rx*ry)/10**9, (ry**2)/10**9, (rx**3)/10**12, (rx**2*ry)/10**12, (rx*ry**2)/10**12, (ry**3)/10**12
+    ]).T
+    
+    X_dy = np.vstack([
+        np.ones(len(y)), (y)/10**6, (x)/10**6, (y**2)/10**12, (y*x)/10**12, (x**2)/10**12, (y**3)/10**15, (y**2*x)/10**15, (y*x**2)/10**15, (x**3)/10**15,
+                         (ry)/10**6, (rx)/10**6, (ry**2)/10**9, (ry*rx)/10**9, (rx**2)/10**9, (ry**3)/10**12, (ry**2*rx)/10**12, (ry*rx**2)/10**12
+    ]).T
+    
+    coeff_dx = coeff_df[coeff_df['LOT_ID'] == lot_id]['Coeff_dx'].values[0]
+    coeff_dy = coeff_df[coeff_df['LOT_ID'] == lot_id]['Coeff_dy'].values[0]
+    
+    Y_dx_pred = X_dx.dot(coeff_dx)  # dx에 대한 예측값
+    Y_dy_pred = X_dy.dot(coeff_dy)  # dy에 대한 예측값
+    
+    residual_x = group['X_reg'] - Y_dx_pred
+    residual_y = group['Y_reg'] - Y_dy_pred
+    
+    predictions_list.append(pd.DataFrame({
+        'LOT_ID': lot_id,
+        'DIE_X': die_x,
+        'DIE_Y': die_y,
+        'Y_dx_pred': Y_dx_pred,
+        'Y_dy_pred': Y_dy_pred,
+        'residual_x': residual_x,
+        'residual_y': residual_y,
+        'coordinate_X' : field_x,
+        'coordinate_Y' : field_y,
+
+
+    }))
+
+# 예측 데이터를 DataFrame으로 변환
+df_predictions = pd.concat(predictions_list, ignore_index=True)
+
+# 기존의 output.xlsx 파일을 불러오거나 새로 생성
+excel_path = 'C:/vscode/MODULE/output.xlsx'
+
+with pd.ExcelWriter(excel_path, engine='openpyxl', mode='a') as writer:
+    writer.book = book  # 기존 파일 내용을 가져오기
+    df_predictions.to_excel(writer, sheet_name='Predictions', index=False)
+
+
+
+############################ MULTI LOT CPE ############################################################################
+
+
+
+# 엑셀 파일에서 데이터 불러오기 (실제 파일 경로로 변경 필요)
+df = pd.read_excel("C:/vscode/MODULE/output.xlsx", "Predictions")
+
+# 'shot' 별로 데이터를 그룹화 (고유한 die_x, die_y 조합)
+grouped = df.groupby(['LOT_ID', 'DIE_X', 'DIE_Y'])
+
+# 회귀분석 결과를 저장할 리스트 (딕셔너리 객체들로 구성됨)
+shot_regression_results = []  # 딕셔너리가 아닌 리스트로 선언
+
+
+
+for (lot_id, die_x, die_y), group in grouped:
+    # 독립변수와 종속변수 설정 ('coordinate_X', 'coordinate_Y'를 독립변수로 사용)
+    X = group[['coordinate_X', 'coordinate_Y']]
+    Yx = group['residual_x']
+    Yy = group['residual_y']
+
+    # 독립변수 배열 구성 및 최소자승법으로 회귀 계수 구하기
+    X_dx = np.vstack([np.ones(len(X)), X['coordinate_X']/10**6, X['coordinate_Y']/10**6]).T
+    coeff_dx = np.linalg.lstsq(X_dx, Yx, rcond=None)[0]
+    
+    X_dy = np.vstack([np.ones(len(X)), X['coordinate_Y']/10**6, X['coordinate_X']/10**6]).T
+    coeff_dy = np.linalg.lstsq(X_dy, Yy, rcond=None)[0]
+
+    # 회귀분석 결과를 리스트에 저장
+    shot_regression_results.append({
+        'LOT_ID': lot_id,
+        'DIE_X': die_x,
+        'DIE_Y': die_y,
+        'RK1': coeff_dx[0],
+        'RK2': coeff_dy[0],
+        'RK3': coeff_dx[1],
+        'RK4': coeff_dy[1],
+        'RK5': coeff_dx[2],
+        'RK6': coeff_dy[2]
+    })
+
+# 회귀분석 결과를 새로운 DataFrame으로 변환
+regression_df = pd.DataFrame(shot_regression_results)
+
+# 기존 엑셀 파일을 쓰기 모드로 열고 'CPE' 시트에 회귀분석 결과를 저장
+with pd.ExcelWriter("C:/vscode/MODULE/output.xlsx", engine='openpyxl', mode='a') as writer:
+    regression_df.to_excel(writer, sheet_name='CPE', index=False)
+
+print("회귀분석 결과가 엑셀 파일에 저장되었습니다.")
+
+
