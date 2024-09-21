@@ -1,3 +1,47 @@
+
+```
+# TROCS Input Decorrect   
+
+# 20240921
+1.  "MODULE/11. DE-TRCOS_3차.ipynb" 를 그대로 카피함
+
+2. hyper(rk21이후) 단위 수정 필요
+
+        unit_off = 1          'um                  canon 단위
+        unit_1st = 10 ^ -6    'ppm
+        unit_2nd = 10 ^ -9    'ppg/um
+        unit_3rd = 10 ^ -12   'ppt/um^2
+        unit_4th = 10 ^ -16   'e^-16/um^3
+        unit_5th = 10 ^ -20   'e^-20/um^4
+        unit_6th = 10 ^ -24   'e^-24/um^5
+        unit_7th = 10 ^ -28   'e^-28/um^6
+        unit_8th = 10 ^ -32   'e^-32/um^7
+        unit_9th = 10 ^ -36   'e^-36/um^8
+        unit_nm = 10 ^ -3     'nm
+
+
+
+Case 3  ' GPM_hybrid    
+        unit_off = 1          'um                  canon 단위
+        unit_1st = 10 ^ -6    'ppm
+        unit_2nd = 10 ^ -9    'ppg/um
+        unit_3rd = 10 ^ -12   'ppt/um^2
+        
+        unit_4th = 10 ^ -19   'nm/cm^4      ASML 단위
+        unit_5th = 10 ^ -23   'nm/cm^5
+        unit_6th = 10 ^ -27   'nm/cm^6
+        unit_7th = 10 ^ -31   'nm/cm^7
+        unit_8th = 10 ^ -35   'nm/cm^8
+        unit_9th = 10 ^ -39   'nm/cm^9
+        unit_nm = 10 ^ -3     'nm
+
+
+3. rk5 부호반대처리 
+
+```
+
+
+
 import pandas as pd
 import numpy as np
 import os
