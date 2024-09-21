@@ -37,4 +37,9 @@
 
         
     
+### 잔여 작업 할것
+1. ADI M3S계산을 OCM과 맞춰주려고 함.   X_REG_demrc + MRC_X 계산해서 신규컬럼 추가.
+2. WAFERMAP 배열 수정. MRC포함된 FITTING MAP은 필요없어보임.   Raw의 기준을  X_REG_demrc + MRC_X  으로 변경하고. (ocm의 E1과 같음)   이걸 FITTING한것으로 바꾸자. 
+3. NAU여러개로 TREND 차트 구성 좀 생각해보자.
+4. 
 
