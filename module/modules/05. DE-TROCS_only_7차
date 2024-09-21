@@ -1,0 +1,235 @@
+import pandas as pd
+import numpy as np
+import os
+from openpyxl import load_workbook
+import openpyxl
+
+
+##### TROCS Input Decorrect ##### 
+
+def trocs_decorrect(df_rawdata, df_trocs_input):
+
+    
+    # 'shot' 별로 데이터를 그룹화 (고유한 lot_id, die_x, die_y 조합)
+    grouped = df_rawdata.groupby(['UNIQUE_ID', 'DieX', 'DieY'])
+    
+    # 예측 결과를 저장할 리스트
+    trocs_input_list = []
+
+    # 각 그룹에 대해 연산 수행
+    for (unique_id, diex, diey), group in grouped:
+
+        stepseq = group['STEPSEQ']
+        lot_id = group['LOT_ID']
+        wafer = group['Wafer']
+        p_eqpid = group['P_EQPID']
+        photo_ppid = group['Photo_PPID']
+        p_time = group['P_TIME']
+        m_time = group['M_TIME']
+        chuckid = group['ChuckID']
+        reticleid = group['ReticleID']
+        base_eqp1 = group['Base_EQP1']
+        test = group['TEST']
+        die_x = group['DieX']
+        die_y = group['DieY']
+        mrc_x = group['MRC_X']
+        mrc_y = group['MRC_Y']
+        step_pitch_x = group['STEP_PITCH_X']
+        step_pitch_y = group['STEP_PITCH_Y']
+        map_shift_x = group['MAP_SHIFT_X']
+        map_shift_y = group['MAP_SHIFT_Y']
+        coordinate_x = group['coordinate_X']
+        coordinate_y = group['coordinate_Y']   
+        wf_x = group['wf_x']
+        wf_y = group['wf_y']        
+        x_reg = group['X_reg']
+        y_reg = group['Y_reg']
+        pred_x = group['pred_x']
+        pred_y = group['pred_y']
+        residual_x = group['residual_x']
+        residual_y = group['residual_y']
+        cpe_pred_x = group['cpe_pred_x']
+        cpe_pred_y = group['cpe_pred_y']
+        cpe_resi_x = group['cpe_resi_x']
+        cpe_resi_y = group['cpe_resi_y']
+        mrc_fit_x = group['mrc_fit_x']
+        mrc_fit_y = group['mrc_fit_y']
+        x_reg_demrc = group['X_reg_demrc']
+        y_reg_demrc = group['Y_reg_demrc']      
+
+
+        # 독립변수 설정 ('coordinate_X', 'coordinate_Y'를 독립변수로 사용)
+        rx = group['coordinate_X'].values
+        ry = group['coordinate_Y'].values
+        
+
+
+        '''
+        unit_off = 1          'um                  canon 단위
+        unit_1st = 10 ^ -6    'ppm
+        unit_2nd = 10 ^ -9    'ppg/um
+        unit_3rd = 10 ^ -12   'ppt/um^2
+        unit_4th = 10 ^ -16   'e^-16/um^3
+        unit_5th = 10 ^ -20   'e^-20/um^4
+        unit_6th = 10 ^ -24   'e^-24/um^5
+        unit_7th = 10 ^ -28   'e^-28/um^6
+        unit_8th = 10 ^ -32   'e^-32/um^7
+        unit_9th = 10 ^ -36   'e^-36/um^8
+        unit_nm = 10 ^ -3     'nm
+
+        unit_off = 1          'um                  canon 단위
+        unit_1st = 10 ^ -6    'ppm
+        unit_2nd = 10 ^ -9    'ppg/um
+        unit_3rd = 10 ^ -12   'ppt/um^2
+        
+        unit_4th = 10 ^ -19   'nm/cm^4      ASML 단위
+        unit_5th = 10 ^ -23   'nm/cm^5
+        unit_6th = 10 ^ -27   'nm/cm^6
+        unit_7th = 10 ^ -31   'nm/cm^7
+        unit_8th = 10 ^ -35   'nm/cm^8
+        unit_9th = 10 ^ -39   'nm/cm^9
+        unit_nm = 10 ^ -3     'nm
+
+        '''
+
+
+        # 독립 변수 배열구성
+        X_dx = np.vstack([
+            np.ones(len(rx)),
+            (rx)/1e6,     (-ry)/1e6, 
+            (rx**2)/1e9,  (rx*ry)/1e9,     (ry**2)/1e9,
+            (rx**3)/1e12, (rx**2*ry)/1e12, (rx*ry**2)/1e12,    (ry**3)/1e12,
+            (rx**4)/1e19, (rx**3*ry)/1e19, (rx**2*ry**2)/1e19, (rx*ry**3)/1e19,    (ry**4)/1e19,
+            (rx**5)/1e23, (rx**4*ry)/1e23, (rx**3*ry**2)/1e23, (rx**2*ry**3)/1e23, (rx*ry**4)/1e23,    (ry**5)/1e23,
+            (rx**6)/1e27, (rx**5*ry)/1e27, (rx**4*ry**2)/1e27, (rx**3*ry**3)/1e27, (rx**2*ry**4)/1e27, (rx*ry**5)/1e27,    (ry**6)/1e27,
+            (rx**7)/1e31, (rx**6*ry)/1e31, (rx**5*ry**2)/1e31, (rx**4*ry**3)/1e31, (rx**3*ry**4)/1e31, (rx**2*ry**8)/1e31, (rx*ry**6)/1e31, (ry**7)/1e31
+        ]).T
+
+        X_dy = np.vstack([
+            np.ones(len(ry)), 
+            (ry)/1e6,     (rx)/1e6,
+            (ry**2)/1e9,  (ry*rx)/1e9,     (rx**2)/1e9,
+            (ry**3)/1e12, (ry**2*rx)/1e12, (ry*rx**2)/1e12,    (rx**3)/1e12,
+            (ry**4)/1e19, (ry**3*rx)/1e19, (ry**2*rx**2)/1e19, (ry*rx**3)/1e19,    (rx**4)/1e19,
+            (ry**5)/1e23, (ry**4*rx)/1e23, (ry**3*rx**2)/1e23, (ry**2*rx**3)/1e23, (ry*rx**4)/1e23,    (rx**5)/1e23,
+            (ry**6)/1e27, (ry**5*rx)/1e27, (ry**4*rx**2)/1e27, (ry**3*rx**3)/1e27, (ry**2*rx**4)/1e27, (ry*rx**5)/1e27,    (rx**6)/1e27,
+            (ry**7)/1e31, (ry**6*rx)/1e31, (ry**5*rx**2)/1e31, (ry**4*rx**3)/1e31, (ry**3*rx**4)/1e31, (ry**2*rx**8)/1e31, (ry*rx**6)/1e31, (rx**7)/1e31    
+            
+        ]).T
+        
+        
+
+        # 종속변수 설정 ( TROCS INPUT의 RK값을 독립변수로 사용)
+        # trocs 시트에서 해당 LOT_ID에 해당하는 rk1~rk72 값을 추출
+        trocs_row = df_trocs_input[(df_trocs_input['UNIQUE_ID'] == unique_id) & (df_trocs_input['dCol'] == diex) & (df_trocs_input['dRow'] == diey)]
+        if trocs_row.empty:
+            print(f"UNIQUE_ID {unique_id}에 해당하는 trocs 데이터가 없습니다.")
+            continue
+
+        
+        # 홀수 rk 값 (Y_dx)과 짝수 rk 값 (Y_dy) 추출
+        # rk1 ~ rk72까지의 열을 rk_values로 가져오기
+        rk_values = trocs_row.iloc[:, 14:86]  # rk1 ~ rk72 열을 선택
+
+
+        ''' 3차까지만 '''
+
+        # Y_dx는 rk1부터 rk71까지 홀수 열을 추출
+        Y_dx = rk_values.iloc[:, ::2].values.flatten()  # rk1, rk3, rk5, ..., rk19까지 선택
+       
+
+        # Y_dy는 rk2부터 rk72까지 짝수 열을 추출
+        Y_dy = rk_values.iloc[:, 1::2].values.flatten()  # rk2, rk4, rk6, ..., rk20까지 선택
+
+    
+        # 결과 확인
+        #print("Y_dx:", Y_dx)
+        #print("Y_dy:", Y_dy)
+                  
+        # 행렬 곱을 통해 예측 값 계산
+        trocs_fit_x = X_dx.dot(Y_dx)
+        trocs_fit_y = X_dy.dot(Y_dy)
+       
+
+        residual_x_detrocs = group['residual_x'] - trocs_fit_x
+        residual_y_detrocs = group['residual_y'] - trocs_fit_y
+
+
+        # 결과 저장
+        trocs_input_list.append(pd.DataFrame({
+            'UNIQUE_ID': unique_id,
+            'STEPSEQ' : stepseq, 
+            'LOT_ID' : lot_id,
+            'Wafer' : wafer, 
+            'P_EQPID' : p_eqpid,
+            'Photo_PPID' : photo_ppid,
+            'P_TIME' : p_time,
+            'M_TIME' : m_time,
+            'ChuckID' : chuckid,
+            'ReticleID' : reticleid,
+            'Base_EQP1' : base_eqp1,
+            'TEST' : test,
+            'DieX' : die_x,
+            'DieY' : die_y,
+            'MRC_X' : mrc_x,
+            'MRC_Y' : mrc_y,
+            'STEP_PITCH_X' : step_pitch_x,
+            'STEP_PITCH_Y' : step_pitch_y,
+            'MAP_SHIFT_X' : map_shift_x,
+            'MAP_SHIFT_Y' : map_shift_y,
+            'coordinate_X' : coordinate_x,
+            'coordinate_Y' : coordinate_y,
+            'wf_x' : wf_x,
+            'wf_y' : wf_y,
+            'X_reg' : x_reg,
+            'Y_reg' : y_reg,
+            'pred_x': pred_x,
+            'pred_y': pred_y,
+            'residual_x': residual_x,
+            'residual_y': residual_y,
+            'cpe_pred_x': cpe_pred_x,
+            'cpe_pred_y': cpe_pred_y,
+            'cpe_resi_x': cpe_resi_x,
+            'cpe_resi_y': cpe_resi_y,
+            'mrc_fit_x': mrc_fit_x,
+            'mrc_fit_y': mrc_fit_y,
+            'X_reg_demrc': x_reg_demrc,
+            'Y_reg_demrc': y_reg_demrc,
+
+            'trocs_fit_x': trocs_fit_x,
+            'trocs_fit_y': trocs_fit_y,
+            'residual_x_detrocs' : residual_x_detrocs,
+            'residual_y_detrocs' : residual_y_detrocs
+               
+        }))
+        
+
+
+    # 결과 병합
+    df_trocs_de = pd.concat(trocs_input_list, ignore_index=True)
+    # 정렬 (★ 기존데이터의 정렬순서와 맞춰주기위한 작업)
+    df_trocs_de = df_trocs_de.sort_values(by=['UNIQUE_ID', 'TEST', 'DieX', 'DieY'])
+    return df_trocs_de
+
+
+
+
+
+################################### TROCS Input Decorrect #####################################################################
+
+# 데이타 불러오기 
+df_rawdata = pd.read_excel('output_7차.xlsx', sheet_name='MRC_decorrect')
+df_trocs_input = pd.read_excel('output_7차.xlsx', sheet_name='Trocs Input')
+
+# TROCS Input(Shot별 RK값)을 fitting하고 residual_x에서 빼주기 
+df_trocs_de = trocs_decorrect(df_rawdata, df_trocs_input)
+
+# mrc_de 결과를 엑셀 파일에 저장
+with pd.ExcelWriter('output_7차.xlsx', engine='openpyxl', mode='a', if_sheet_exists='replace') as writer:
+    df_trocs_de.to_excel(writer, sheet_name='TROCS_decorrect', index=False)
+
+
+
+
+
+
