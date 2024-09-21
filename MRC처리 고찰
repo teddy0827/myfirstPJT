@@ -1,0 +1,106 @@
+
+############################################################################################################################################
+* NAU파일에서
+X_reg = 계측기에서 읽은 순수RAW 
+MRC_X = -PSM + POINT MRC
+MRC_RX = POINT MRC
+
+
+질문1. MRC_X 에는 왜 -PSM,  POINT MRC 둘다 들어가있나 ? 
+=> 순수RAW - PSM + POINT MRC로 한번에 계산할 수 있어서. 
+   
+질문2. PSM은 왜 부호가 반대인가 ? 
+=> ADI기준임.  순수raw에서 PSM Input을 제거하려는 목적임. 
+     PSM INPUT은 Oncell 타켓팅용으로 들어갔기때문에   순수raw에 반영되면 안된다.  (=판정에서 제외)
+     만약 PSM을 빼지않는다면,     PSM INPUT으로 인해 순수RAW가 영향을 받게 된다. 
+
+
+
+* 용어 정리
+F1 = 순수RAW - PSM + POINT MRC 를 Regression한 K값
+E1 = F1 K값에서 K MRC Input 만큼 빼줌. 
+MRC_ADI = 순수RAW - PSM       ( MRC_CALC에서 MRC계산용으로 ADI를 따로 계산한 값이 MRC_ADI임. )
+
+
+질문3.   MRC_ADI 를 계산하려면 어떻게 해야하나 ? 
+=> -PSM을 따로 계산해줘야한다. 
+     MRC_X - MRC_RX 로 계산가능.  (엑셀참고) 
+      그값에 순수RAW 더해주면 된다.   
+
+
+
+
+* 결론적으로
+X_REG에서 MRC_X 를 더해주는것의 의미
+순수RAW에서 PSM INPUT은 빼주고, POINT MRC는 더해준다.   => F1 계산
+
+순수RAW - PSM + POINT  으로 REGRESSION 한게,    F1(EXPO)가 되는것이고. 
+F1에서 K MRC INPUT(GPM)만큼 빼준게 E1(DECISION1)이 된다. 
+
+
+
+############################################################################################################################################
+
+
+* 용어 
+F1 = 순수RAW - PSM + POINT MRC 를 Regression한 K값
+E1 = F1 K값에서 K MRC Input 만큼 빼줌. 
+MRC_ADI = 순수RAW - PSM
+
+
+* NAU파일에서는
+X_reg = 계측기에서 읽은 순수RAW 
+MRC_X = -PSM + POINT MRC
+MRC_RX = POINT MRC
+
+
+
+Q1.  순수RAW를 그대로 쓰면 안되나 ? 
+       -> PSM Input이 없다면 상관없다.
+            PSM Input이 있다면, 그대로 쓰면 안되고,  PSM Input만큼 빼줘야한다. 
+            
+Q2. 순수RAW에서 PSM Input을 왜 빼주나 ?  ( ADI 기준) 
+    PSM INPUT은 Oncell 타켓팅용으로 들어갔기때문에   순수raw에 반영되면 안된다.  (=판정에서 제외)
+    만약 PSM을 빼지않는다면,     PSM INPUT으로 인해 순수RAW가 영향을 받게 된다. 
+     즉, PSM INPUT 은  ADI 순수RAW에 영향을 주면 안되기떄문에,   MRC_X에서 PSM INPUT의 부호반대를 취해주고,   순수RAW + PSM으로 계산한다. 
+
+
+
+
+
+1. MRC_X 에는    -PSM 과 POINT MRC(MRC_RX)  둘다 포함되어있다.
+  -  왜 부호반대처리한 -PSM 인가 ? 
+
+
+ MRC_X 에서 Point MRC(MRC_RX)만큼 빼주면 PSM 이 된다.
+   근데 부호는 반대이다.   PSM INPUT의 부호를 반대로 한게 MRC_X 가 된다.
+
+
+그렇다면,
+순수RAW(X_REG)에서 MRC_X를 더해준다는 의미는 
+PSM INPUT을 더해준다는게 아니라,  빼준다는 의미이다. ->   순수RAW - PSM 
+
+순수RAW에서 PSM만큼을 왜 뺄까 ? 
+PSM INPUT은 Oncell 타켓팅용으로 들어갔기때문에    순수raw에 반영되면 안되어서.
+만약 PSM을 빼지않는다면,     PSM INPUT으로 인해 순수RAW가 영향을 받게 된다. 
+PSM INPUT 은  ADI 순수RAW에 영향을 주면 안되기떄문에,   MRC_X(=PSM INPUT의 부호반대)를 더해주게 되는것이다.
+
+
+
+
+
+* POINT MRC관점에서는
+Point MRC(MRC_RX)를  순수raw에 더해줘야한다. 
+그렇게 하려면,  MRC_X는     MRC_RX(POINT MRC)를 더한 형태가 되야한다. 
+MRC_X = PSM INPUT의 부호반대 + POINT MRC 
+
+결론적으로
+X_REG에서 MRC_X 를 더해주는것의 의미
+순수RAW에서 PSM INPUT은 빼주고, POINT MRC는 더해준다.
+
+즉,   
+순수RAW - PSM + POINT  으로 REGRESSION 한게,    F1(EXPO)가 되는것이고. 
+F1에서 K MRC INPUT(GPM)만큼 빼준게 E1(DECISION1)이 된다. 
+
+
+
