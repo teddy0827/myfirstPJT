@@ -6,35 +6,4 @@
 
 # 20241006
 output_m3s.xlsx 파일불러와서 차트그리는 도중에 에러발생
-
---------------------------------------------------------------------------
-ValueError                                Traceback (most recent call last)
-c:\py_data\module\modules5(csv)\08. m3s_색깔구분.ipynb Cell 2 line 1
-      7 excel_data = pd.read_excel(file_path)
-      9 # 'P_TIME'을 시간 형식으로 변환
----> 10 excel_data['P_TIME'] = pd.to_datetime(excel_data['P_TIME'])
-     12 # 세 가지 컬럼을 합쳐서 고유한 그룹 생성
-     13 excel_data['group'] = excel_data[['M_STEP', 'P_EQPID', 'Photo_PPID', 'GROUP']].agg('_'.join, axis=1)
-
-File c:\Users\taeho0827.oh.SECDS\AppData\Local\aipforge\lib\site-packages\pandas\core\tools\datetimes.py:1112, in to_datetime(arg, errors, dayfirst, yearfirst, utc, format, exact, unit, infer_datetime_format, origin, cache)
-   1110         result = arg.map(cache_array)
-   1111     else:
--> 1112         values = convert_listlike(arg._values, format)
-   1113         result = arg._constructor(values, index=arg.index, name=arg.name)
-   1114 elif isinstance(arg, (ABCDataFrame, abc.MutableMapping)):
-
-File c:\Users\taeho0827.oh.SECDS\AppData\Local\aipforge\lib\site-packages\pandas\core\tools\datetimes.py:488, in _convert_listlike_datetimes(arg, format, name, utc, unit, errors, dayfirst, yearfirst, exact)
-    486 # `format` could be inferred, or user didn't ask for mixed-format parsing.
-    487 if format is not None and format != "mixed":
---> 488     return _array_strptime_with_fallback(arg, name, utc, format, exact, errors)
-    490 result, tz_parsed = objects_to_datetime64ns(
-    491     arg,
-    492     dayfirst=dayfirst,
-   (...)
-    496     allow_object=True,
-...
-
-ValueError: time data "-" doesn't match format "%Y-%m-%d %H:%M:%S", at position 24. You might want to try:
-    - passing `format` if your strings have a consistent format;
-    - passing `format='ISO8601'` if your strings are all ISO8601 but not necessarily in exactly the same format;
-    - passing `format='mixed'`, and the format will be inferred for each element individually. You might want to use `dayfirst` alongside this.
+-> NaT(Not a Time)으로 결측치 처리하게 코드 변경함
