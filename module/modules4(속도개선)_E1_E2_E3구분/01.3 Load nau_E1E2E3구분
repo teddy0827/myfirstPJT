@@ -1,3 +1,20 @@
+
+```
+    
+# 20241005 
+1. 077251의 경우에는 E1,E2,E3 3개의 NAU 파일이 있어서 중복됨.  E2,E3로 끝나는 파일은 제거처리해야함.
+2. TEST NO로 E1, E2, E3로 구분지어서 Unique_id에 구분자 넣어줘야함. 
+   E1 = TEST1~80 (G2A)
+   E2 = TEST81~160 (G2D)
+   E3 = TEST161~240 (D2A)
+
+3. PSM Fitting시에 문제발생.    PerShorMRC 시트의 unique id와  RawData-1의 unique id(E1,E2,E3붙음)가 다름.   PSM과 동일한 형식으로 Unique ID3을 추가해봄.
+
+
+```
+
+
+
 import pandas as pd
 import numpy as np
 import os
