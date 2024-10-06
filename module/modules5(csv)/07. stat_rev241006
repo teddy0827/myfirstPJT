@@ -1,0 +1,82 @@
+# 20241005 : E1,E2,E3 로 색깔 구분위해   'GROUP' 컬럼도 추가함.
+
+# 20241006 : M_STEP은 삭제함.  MMO_MRC_EQP 추가함. 
+
+
+
+import pandas as pd
+
+# 엑셀 파일 경로 및 시트 이름
+file_path = 'Delta_PSM.csv'
+
+# csv 파일 불러오기
+df = pd.read_csv(file_path)
+
+# 계산할 컬럼 목록
+columns_to_calculate = [
+    'X_reg', 'Y_reg', 'pred_x', 'pred_y', 'residual_x', 'residual_y',  
+    'psm_fit_x', 'psm_fit_y', 'residual_x_depsm', 'residual_y_depsm',
+    'cpe19p_pred_x', 'cpe19p_pred_y', 'cpe19p_resi_x', 'cpe19p_resi_y',
+    'ideal_psm_x', 'ideal_psm_y', 'delta_psm_x', 'delta_psm_y' ]
+
+# 'UNIQUE_ID' 기준으로 그룹화하여 mean과 std(표준편차) 계산 (mean 후 절대값 적용)
+grouped = df.groupby('UNIQUE_ID').agg({col: ['mean', 'std'] for col in columns_to_calculate})
+
+# 컬럼명 재정의 (mean과 std의 멀티인덱스를 단일 인덱스로 변환)
+grouped.columns = [f'{col}_{stat}' for col, stat in grouped.columns]
+
+# mean에 절대값 적용
+for col in columns_to_calculate:
+    grouped[f'{col}_mean'] = grouped[f'{col}_mean'].abs()
+
+# mean + 3 * sigma 계산
+for col in columns_to_calculate:
+    grouped[f'{col}_m3s'] = grouped[f'{col}_mean'] + 3 * grouped[f'{col}_std']
+
+# 첫 번째 값을 그룹화해서 각각 추가
+grouped['STEPSEQ'] = df.groupby('UNIQUE_ID')['STEPSEQ'].first()
+grouped['LOT_ID'] = df.groupby('UNIQUE_ID')['LOT_ID'].first()
+grouped['Wafer'] = df.groupby('UNIQUE_ID')['Wafer'].first()
+grouped['P_EQPID'] = df.groupby('UNIQUE_ID')['P_EQPID'].first()
+grouped['Photo_PPID'] = df.groupby('UNIQUE_ID')['Photo_PPID'].first()
+grouped['P_TIME'] = df.groupby('UNIQUE_ID')['P_TIME'].first()
+# grouped['M_STEP'] = df.groupby('UNIQUE_ID')['M_STEP'].first()
+grouped['M_TIME'] = df.groupby('UNIQUE_ID')['M_TIME'].first()
+grouped['ChuckID'] = df.groupby('UNIQUE_ID')['ChuckID'].first()
+grouped['ReticleID'] = df.groupby('UNIQUE_ID')['ReticleID'].first()
+grouped['Base_EQP1'] = df.groupby('UNIQUE_ID')['Base_EQP1'].first()
+grouped['GROUP'] = df.groupby('UNIQUE_ID')['GROUP'].first()
+grouped['MMO_MRC_EQP'] = df.groupby('UNIQUE_ID')['MMO_MRC_EQP'].first()
+
+
+# 원하는 컬럼 순서 정의
+desired_column_order = [
+    'STEPSEQ', 'LOT_ID', 'Wafer', 'P_EQPID', 'Photo_PPID', 'P_TIME',
+    'M_TIME', 'ChuckID', 'ReticleID', 'Base_EQP1', 'MMO_MRC_EQP', 'GROUP'
+]
+# M_STEP은 삭제함
+
+
+
+# 계산된 컬럼 추가
+for col in columns_to_calculate:
+    desired_column_order.extend([
+        f'{col}_mean',
+        f'{col}_std',
+        f'{col}_m3s'
+    ])
+
+# DataFrame의 컬럼을 재배열
+grouped = grouped[desired_column_order]
+
+# 인덱스 재설정 (필요에 따라)
+grouped.reset_index(inplace=True)
+
+# 새로운 파일로 저장 (CSV 형식으로 저장)
+output_file_path = 'output_m3s.csv'
+grouped.to_csv(output_file_path, index=False)
+
+print("컬럼 배치 순서 변경 및 절대값 적용 후 mean + 3sigma 계산 완료 및 저장됨:", output_file_path)
+
+
+ 
