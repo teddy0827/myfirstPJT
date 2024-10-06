@@ -7,3 +7,6 @@
 # 20241006
 output_m3s.xlsx 파일불러와서 차트그리는 도중에 에러발생
 -> NaT(Not a Time)으로 결측치 처리하게 코드 변경함
+
+# 20241006(2)
+CPE Fitting이 오래 걸림.  raw와 PSM을 매칭할때 조건이 많아서 그런거 같음.   UNIQUE_ID,  DIE_X, DIE_Y  3개 조건을 매칭해서 찾고 있는데.    UNIQUE_ID에  DIE_X,Y 정보까지 추가해서,   1개의 조건만으로 매칭하면 좀 시간단축될거같음.
